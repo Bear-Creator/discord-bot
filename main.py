@@ -34,8 +34,7 @@ except (Exception, Error) as error:
 async def on_ready():
     print("Бот включен\n ")
     
-    global db, curs
-    
+
 
 
 @bot.event
@@ -44,7 +43,6 @@ async def on_message(msg):
     if author != bot.user:
         text = msg.content
         print(f'{author}: {text}')
-        
 
 
 
