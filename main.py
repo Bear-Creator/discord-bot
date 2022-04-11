@@ -1,49 +1,69 @@
+import discord
+from discord.utils import get
 from discord.ext import commands
-import psycopg2
-from psycopg2 import Error
+import sqlite3
 from config import settings, db
 
-bot = commands.Bot(command_prefix=settings['prefix'])
 
-try:
-    # Подключение к существующей базе данных
-    db = psycopg2.connect(user=db['user'],
-                          password=db['password'],
-                          host=db['host'],
-                          port=db['port'],
-                          database=db['database'])
-
-    #Курсор для выполнения операций с базой данных
-    curs = db.cursor()
-
-    # Распечатать сведения о PostgreSQL
-    print("Информация о сервере PostgreSQL")
-    print(db.get_dsn_parameters(), "\n")
-
-    # Выполнение SQL-запроса
-    curs.execute("SELECT version();")
-
-    # Получить результат
-    print("Вы подключены к - ", curs.fetchone(), "\n")
-
-except (Exception, Error) as error:
-    print("Ошибка при работе с PostgreSQL", error)
-
+bot = commands.Bot(command_prefix=settings['prefix'], intents = discord.Intents.all())
+print('Подключение к БД...')
+db = sqlite3.connect('server.db')
+curs = db.cursor()
 
 @bot.event
 async def on_ready():
     print("Бот включен\n ")
-    
-
-
+    print('Создание таблицы')
+    curs.execute('''CREATE TABLE if NOT EXISTS users (
+        id          int,
+        username    varchar(80),
+        firstname   varchar(80),
+        middlename  varchar(80),
+        surname     varchar(80),
+        birthday    date
+        );''')
+    db.commit()
+    for guild in bot.guilds:
+        for member in guild.members:
+            if curs.execute(f'SELECT id FROM users WHERE id = {member.id}').fetchone() is None and member != bot.user:
+                curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{member.id}", "{member}")')
+                db.commit()
+                await bot.get_channel(settings['regchan']).send(f'@{member}, пройдите регистрацию чтобы начать RP. Если готовы, напишите "Регистрация".')
+                print(member)
+            else:
+                pass
 
 @bot.event
-async def on_message(msg):
-    author = msg.author
-    if author != bot.user:
-        text = msg.content
-        print(f'{author}: {text}')
+async def on_member_join(member):
+    if curs.execute(f'SELECT id FROM users WHERE id = {member.id}').fetchone() is None:
+        curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{member.id}", "{member}")')
+        db.commit()
+        await bot.get_channel(settings['regchan']).send(f'@{member}, пройдите регистрацию чтобы начать RP. Если готовы, напишите "$reg".')
+        print(member)
+    else:
+        pass
+
+@bot.command() # Command to start registration
+async def reg(ctx):
+    print("создание комнаты")
+    guild = ctx.message.guild
+    member = ctx.author
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        member: discord.PermissionOverwrite(read_messages=True),
+    }
+    channel = await guild.create_text_channel(f'регистрация {member}', overwrites = overwrites)
+    await ctx.reply(f'Переходи в эту комнату: <#{channel.id}>')
 
 
+#@bot.event
+#async def on_message(msg):
+#    author = msg.author
+#    if author != bot.user:
+#        text = msg.content
+#        print(f'{author}: {text}')
+
+
+        
 
 bot.run(settings['token'])
