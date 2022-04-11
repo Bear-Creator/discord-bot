@@ -1,0 +1,5 @@
+config.py
+server.db
+test.py
+test.sql
+__pycache__
