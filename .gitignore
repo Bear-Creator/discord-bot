@@ -3,3 +3,5 @@ server.db
 test.py
 test.sql
 __pycache__
+config.py
+config.py
