@@ -1,5 +1,5 @@
 settings = {
-    'token': 'OTQyNDkxODE3NjI5MzIzMzE1.YglR5w.LgGf3jPVUEairyoHvItchwi2hFo', #Bot token
+    'token': 'OTQyNDkxODE3NjI5MzIzMzE1.YglR5w.m8ZnGZANXb7OZkQMvkzmAxDWkfc', #Bot token
     'bot': 'Таможня', #Bot's name
     'id':  942491817629323315, #Bots ID
     'prefix': '!', #command prefix

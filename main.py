@@ -1,5 +1,4 @@
 import discord
-from discord.utils import get
 from discord.ext import commands
 import sqlite3
 from config import settings, db
@@ -32,6 +31,7 @@ async def on_ready():
                 print(member)
             else:
                 pass
+    print('Всё готово к работе')
 
 @bot.event
 async def on_member_join(member):
@@ -54,14 +54,20 @@ async def reg(ctx):
     }
     channel = await guild.create_text_channel(f'регистрация {member}', overwrites = overwrites)
     await ctx.reply(f'Переходи в эту комнату: <#{channel.id}>')
+    await bot.get_channel(channel.id).send('Приступим! Ты готов(-а)?')
 
 
-#@bot.event
-#async def on_message(msg):
-#    author = msg.author
-#    if author != bot.user:
-#        text = msg.content
-#        print(f'{author}: {text}')
+@bot.event
+async def on_message(msg):
+    channel = msg.channel
+    author = msg.author
+    if author != bot.user:
+        text = msg.content
+        print(f'{author}: {text}')
+#        if 'регистрация' in channel: Сегодня доделаю!
+
+    
+    await bot.process_commands(msg)
 
 
         
