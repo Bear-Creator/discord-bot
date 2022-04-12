@@ -5,3 +5,4 @@ test.sql
 __pycache__
 config.py
 config.py
+sql-request.sql
