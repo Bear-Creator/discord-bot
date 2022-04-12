@@ -6,21 +6,13 @@ from config import settings
 
 
 
-def reg_in_sql(msg, sql):
-    curs.execute(f'INSERT INTO users ({sql}) VALUES ("{msg}")')
-    db.commit
-    
-
-    
-
-bot = commands.Bot(command_prefix=settings['prefix'], intents = discord.Intents.all())
-print('Подключение к БД...')
-
 global db
 global curs
+print('Подключение к БД...')
 db = sqlite3.connect('server.db')
 curs = db.cursor()
 
+bot = commands.Bot(command_prefix=settings['prefix'], intents = discord.Intents.all())
 
 @bot.event
 async def on_ready():
@@ -75,12 +67,18 @@ async def reg(ctx):
     
 
 @bot.command() #Delete user info
-async def deluser(cxt, a: int):
-    user = curs.execute(f'SELECT username FROM users WHERE id = {a};').fetchone()
-    curs.execute(f'DELETE FROM users WHERE id = {a};')
-    db.commit() 
+async def delusr(cxt, a: str):
+    id = int(a[2:-1])
+    user = curs.execute(f'SELECT username FROM users WHERE id = {id};').fetchone()
+    curs.execute(f'DELETE FROM users WHERE id = {id};')
+    db.commit()
     print(f'Пользователь {user} удалён из базы')
     await cxt.reply(f'Пользователь {user} удалён из базы')
+
+    curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{user.id}", "{user}")')
+    db.commit()
+    await bot.get_channel(settings['regchan']).send(f'<@{user.id}>, пройдите регистрацию чтобы начать RP. Если готовы, напишите "$reg".')
+    print(f'{user} добавлен в базу')
 
 
 @bot.event
