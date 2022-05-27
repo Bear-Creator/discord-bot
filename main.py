@@ -1,4 +1,3 @@
-from sys import prefix
 import time
 import discord
 from discord.ext import commands
@@ -15,12 +14,33 @@ curs = db.cursor()
 prefix = settings['prefix']
 bot = commands.Bot(command_prefix=prefix, intents = discord.Intents.all())
 
+
+# Updates user name
+async def update_userinf(member: discord.Member):
+
+    usr = curs.execute(f'SELECT * FROM users WHERE id = {str(member.id)}').fetchone()
+    if usr[5] != None: #Check if it's no user data
+        fname = usr[2]
+        surname = usr[4]
+        nick = usr[1][:-5]
+        name = fname
+
+        if len(name + surname) <=31: # Max user nickname size is 32
+            name += ' ' + surname
+        if len(name + nick) <= 29:
+            name += ' (' + nick + ')'
+
+        await member.edit(nick=f'{name}')
+    return
+
+
 # Turning bot on/Adding all users in DB
 @bot.event
 async def on_ready():
     print("Бот включен\n ")
-    print('Создание таблицы')
-    curs.execute('''CREATE TABLE if NOT EXISTS users (
+
+    curs.execute(
+        '''CREATE TABLE if NOT EXISTS users (
         id          int,
         username    varchar(80),
         firstname   varchar(80),
@@ -29,16 +49,20 @@ async def on_ready():
         birthday    date
         );''')
     db.commit()
+
     for guild in bot.guilds:
         for member in guild.members:
             if curs.execute(f'SELECT id FROM users WHERE id = {member.id}').fetchone() is None and member != bot.user:
                 curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{member.id}", "{member}")')
                 db.commit()
+
                 await bot.get_channel(settings['regchan']).send(f'<@{member.id}>, пройдите регистрацию чтобы начать RP. Если готовы, напишите "{prefix}reg".')
                 print(f'{member} добавлен в базу')
             else:
                 pass
+
     print('Всё готово к работе')
+
 
 # Adding new users in DB
 @bot.event
@@ -46,27 +70,9 @@ async def on_member_join(member):
     if curs.execute(f'SELECT id FROM users WHERE id = {member.id}').fetchone() is None:
         curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{member.id}", "{member}")')
         db.commit()
+
         await bot.get_channel(settings['regchan']).send(f'<@{member.id}>, пройдите регистрацию чтобы начать RP. Если готовы, напишите "$reg".')
         print(f'{member} добавлен в базу')
-    else:
-        pass
-
-async def update_userinf(member: discord.Member):
-
-    usr = curs.execute(f'SELECT * FROM users WHERE id = {str(member.id)}').fetchone()
-    if usr[5] != None:
-        fname = usr[2]
-        surname = usr[4]
-        nick = usr[1][:-5]
-
-        name = fname
-        if len(name + surname) <=31:
-            name += ' ' + surname
-        if len(name + nick) <= 29:
-            name += ' (' + nick + ')'
-        await member.edit(nick=f'{name}')
-    return
-
 
 
 # Command to start registration
@@ -75,34 +81,37 @@ async def reg(ctx):
     print("создание комнаты")
     guild = ctx.message.guild
     member = ctx.author
-    overwrites = {
+    overwrites = {                                                             #Права для чата регистрации
         guild.default_role: discord.PermissionOverwrite(read_messages=False),
         member: discord.PermissionOverwrite(read_messages=True),
     }
+
     channel = await guild.create_text_channel(f'регистрация {member}', overwrites = overwrites)
-    print(channel)
     send = bot.get_channel(channel.id)
+
     await ctx.reply(f'Переходи в эту комнату: <#{channel.id}>')
     await send.send('Приступим!')
     await send.send('Придумай легенду своего пресонажа')
     await send.send('Напишите имя персонажа')
 
-#Delete user info
+
+#Deletes user info
 @bot.command() 
 async def delinfo(cxt):
     user = cxt.author
     name =  curs.execute(f'SELECT username FROM users WHERE id = {user.id}').fetchone()
-    await user.edit(nick = name)
+    await user.edit(nick = name)  # Returns basic nick name
 
-    curs.execute(f'DELETE FROM users WHERE id = {user.id};')
+    curs.execute(f'DELETE FROM users WHERE id = {user.id};') # Deletes user from DB
     db.commit()
     print(f'Пользователь {user} удалён из базы')
     await cxt.reply(f'Пользователь {user} удалён из базы')
 
-    curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{user.id}", "{user}")')
+    curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{user.id}", "{user}")') # Adds user back in DB
     db.commit()
     await bot.get_channel(settings['regchan']).send(f'<@{user.id}>, пройдите регистрацию чтобы начать RP. Если готовы, напишите "$reg".')
     print(f'{user} добавлен в базу')
+
 
 # On message
 @bot.event
@@ -116,7 +125,7 @@ async def on_message(msg):
     print(f'{author}: {text}')
 
 
-    #message in registration channel
+    # Message in registration channel
     if 'регистрация' in str(channel):
         send_to = bot.get_channel(channel.id)
 
@@ -140,6 +149,7 @@ async def on_message(msg):
             back = 'birthday'
             await send_to.send('Всё! Вы зарегистрированы! Удачного RP, Товарищ!')
             time.sleep(5)
+            print(f'Зарегистрирован пользователь: \n{data}')
 
             if channel:
                 await channel.delete()
@@ -160,8 +170,7 @@ async def on_message(msg):
         await update_userinf(author)
 
 
-
-    await bot.process_commands(msg)
+    await bot.process_commands(msg) #Заставляет команды работать
 
 
 bot.run(settings['token'])
