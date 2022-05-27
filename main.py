@@ -1,3 +1,4 @@
+from sys import prefix
 import time
 import discord
 from discord.ext import commands
@@ -11,9 +12,10 @@ global curs
 print('Подключение к БД...')
 db = sqlite3.connect('server.db')
 curs = db.cursor()
+prefix = settings['prefix']
+bot = commands.Bot(command_prefix=prefix, intents = discord.Intents.all())
 
-bot = commands.Bot(command_prefix=settings['prefix'], intents = discord.Intents.all())
-
+# Turning bot on/Adding all users in DB
 @bot.event
 async def on_ready():
     print("Бот включен\n ")
@@ -32,12 +34,13 @@ async def on_ready():
             if curs.execute(f'SELECT id FROM users WHERE id = {member.id}').fetchone() is None and member != bot.user:
                 curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{member.id}", "{member}")')
                 db.commit()
-                await bot.get_channel(settings['regchan']).send(f'<@{member.id}>, пройдите регистрацию чтобы начать RP. Если готовы, напишите "$reg".')
+                await bot.get_channel(settings['regchan']).send(f'<@{member.id}>, пройдите регистрацию чтобы начать RP. Если готовы, напишите "{prefix}reg".')
                 print(f'{member} добавлен в базу')
             else:
                 pass
     print('Всё готово к работе')
 
+# Adding new users in DB
 @bot.event
 async def on_member_join(member):
     if curs.execute(f'SELECT id FROM users WHERE id = {member.id}').fetchone() is None:
@@ -48,7 +51,26 @@ async def on_member_join(member):
     else:
         pass
 
-@bot.command() # Command to start registration
+async def update_userinf(member: discord.Member):
+
+    usr = curs.execute(f'SELECT * FROM users WHERE id = {str(member.id)}').fetchone()
+    if usr[5] != None:
+        fname = usr[2]
+        surname = usr[4]
+        nick = usr[1][:-5]
+
+        name = fname
+        if len(name + surname) <=31:
+            name += ' ' + surname
+        if len(name + nick) <= 29:
+            name += ' (' + nick + ')'
+        await member.edit(nick=f'{name}')
+    return
+
+
+
+# Command to start registration
+@bot.command() 
 async def reg(ctx):
     print("создание комнаты")
     guild = ctx.message.guild
@@ -64,13 +86,15 @@ async def reg(ctx):
     await send.send('Приступим!')
     await send.send('Придумай легенду своего пресонажа')
     await send.send('Напишите имя персонажа')
-    
 
-@bot.command() #Delete user info
-async def delusr(cxt, a: str):
-    id = int(a[2:-1])
-    user = curs.execute(f'SELECT username FROM users WHERE id = {id};').fetchone()
-    curs.execute(f'DELETE FROM users WHERE id = {id};')
+#Delete user info
+@bot.command() 
+async def delinfo(cxt):
+    user = cxt.author
+    name =  curs.execute(f'SELECT username FROM users WHERE id = {user.id}').fetchone()
+    await user.edit(nick = name)
+
+    curs.execute(f'DELETE FROM users WHERE id = {user.id};')
     db.commit()
     print(f'Пользователь {user} удалён из базы')
     await cxt.reply(f'Пользователь {user} удалён из базы')
@@ -80,55 +104,62 @@ async def delusr(cxt, a: str):
     await bot.get_channel(settings['regchan']).send(f'<@{user.id}>, пройдите регистрацию чтобы начать RP. Если готовы, напишите "$reg".')
     print(f'{user} добавлен в базу')
 
-
+# On message
 @bot.event
 async def on_message(msg):
     channel = msg.channel
     author = msg.author
-    if author != bot.user:
-        text = msg.content
-        print(f'{author}: {text}')
-        if 'регистрация' in str(channel):
-            send_to = bot.get_channel(channel.id)
+    if author == bot.user:
+        return
+    text = msg.content
 
-            info = ('firstname', 'middlename', 'surname', 'birthday')
-            data = curs.execute(f'SELECT firstname, middlename, surname, birthday FROM users WHERE id = {msg.author.id}').fetchone()
-            usrdt = dict(zip(info, data))
+    print(f'{author}: {text}')
 
-            if usrdt['firstname'] == None:
-                back = 'firstname'
-                await send_to.send('Хорошо, теперь отчество')
 
-            elif usrdt['middlename'] == None:
-                back = 'middlename'
-                await send_to.send('Фамилию...')
+    #message in registration channel
+    if 'регистрация' in str(channel):
+        send_to = bot.get_channel(channel.id)
 
-            elif usrdt['surname'] == None:
-                back = 'surname'
-                await send_to.send('...и дату рождения в формате ГГГГ-ММ-ДД (Например: 1950-10-29)')
+        info = ('firstname', 'middlename', 'surname', 'birthday')
+        data = curs.execute(f'SELECT firstname, middlename, surname, birthday FROM users WHERE id = {msg.author.id}').fetchone()
+        usrdt = dict(zip(info, data))
 
-            elif usrdt['birthday'] == None:
-                back = 'birthday'
-                await send_to.send('Всё! Вы зарегистрированы! Удачного RP, Товарищ!')
-                time.sleep(5)
+        if usrdt['firstname'] == None:
+            back = 'firstname'
+            await send_to.send('Хорошо, теперь отчество')
 
-                if channel:
-                    await channel.delete()
+        elif usrdt['middlename'] == None:
+            back = 'middlename'
+            await send_to.send('Фамилию...')
 
-            else:
-                back = False
-                await send_to.send("Вы уже зарегистрированы!")
-                time.sleep(5)
+        elif usrdt['surname'] == None:
+            back = 'surname'
+            await send_to.send('...и дату рождения в формате ГГГГ-ММ-ДД (Например: 1950-10-29)')
 
-                if channel:
-                    await channel.delete()
+        elif usrdt['birthday'] == None:
+            back = 'birthday'
+            await send_to.send('Всё! Вы зарегистрированы! Удачного RP, Товарищ!')
+            time.sleep(5)
+
+            if channel:
+                await channel.delete()
+
+        else:
+            back = False
+            await send_to.send("Вы уже зарегистрированы!")
+            time.sleep(5)
+
+            if channel:
+                await channel.delete()
             
-            if back:
-                print(f'Ввожу {back}')
-                curs.execute(f'UPDATE users SET {back} = "{text}" WHERE id = {author.id}')
-                db.commit()
+        if back:
+            print(f'Ввожу {back}')
+            curs.execute(f'UPDATE users SET {back} = "{text}" WHERE id = {author.id}')
+            db.commit()
 
-            
+        await update_userinf(author)
+
+
 
     await bot.process_commands(msg)
 
