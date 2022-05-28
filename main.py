@@ -78,6 +78,8 @@ async def on_member_join(member):
 # Command to start registration
 @bot.command() 
 async def reg(ctx):
+    await ctx.message.delete()
+
     print("создание комнаты")
     guild = ctx.message.guild
     member = ctx.author
@@ -89,7 +91,7 @@ async def reg(ctx):
     channel = await guild.create_text_channel(f'регистрация {member}', overwrites = overwrites)
     send = bot.get_channel(channel.id)
 
-    await ctx.reply(f'Переходи в эту комнату: <#{channel.id}>')
+    await ctx.channel.send(f'{member.mention}, переходи в эту комнату: <#{channel.id}>', delete_after=5)
     await send.send('Приступим!')
     await send.send('Придумай легенду своего пресонажа')
     await send.send('Напишите имя персонажа')
@@ -97,18 +99,23 @@ async def reg(ctx):
 
 #Deletes user info
 @bot.command() 
-async def delinfo(cxt):
-    user = cxt.author
-    name =  curs.execute(f'SELECT username FROM users WHERE id = {user.id}').fetchone()
+async def delinfo(ctx):
+    await ctx.message.delete()
+
+    user = ctx.author
+    name =  curs.execute(f'SELECT username FROM users WHERE id = {user.id}').fetchone()[0]
     await user.edit(nick = name)  # Returns basic nick name
 
     curs.execute(f'DELETE FROM users WHERE id = {user.id};') # Deletes user from DB
     db.commit()
+
     print(f'Пользователь {user} удалён из базы')
-    await cxt.reply(f'Пользователь {user} удалён из базы')
+    await user.remove_roles(ctx.guild.get_role(settings['citizen']))
+    await ctx.channel.send(f'{user.mention}, Вы удалены из базы')
 
     curs.execute(f'INSERT INTO users ("id", "username") VALUES ("{user.id}", "{user}")') # Adds user back in DB
     db.commit()
+
     await bot.get_channel(settings['regchan']).send(f'<@{user.id}>, пройдите регистрацию чтобы начать RP. Если готовы, напишите "$reg".')
     print(f'{user} добавлен в базу')
 
@@ -149,7 +156,7 @@ async def on_message(msg):
             back = 'birthday'
             await send_to.send('Всё! Вы зарегистрированы! Удачного RP, Товарищ!')
             time.sleep(5)
-            print(f'Зарегистрирован пользователь: \n{data}')
+            await author.add_roles(msg.guild.get_role(settings['citizen']))
 
             if channel:
                 await channel.delete()
